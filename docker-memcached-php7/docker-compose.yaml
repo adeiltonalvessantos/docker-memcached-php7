@@ -1,0 +1,101 @@
+version: '3.7'
+
+services:
+  ### PHP-FPM Container #######################################
+  php-fpm:
+    build:
+      context: ./docker/php-fpm
+      args:
+        user: memora
+        uid: 1000
+    volumes:
+      - .:/var/www/html
+      - ./docker/php-fpm/php7.3.ini:/usr/local/etc/php/php.ini
+      - ./docker/php-fpm/xdebug.ini:/usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
+    expose:
+      - "8000"
+      - "9000"
+      - "9001"
+    extra_hosts:
+      # IMPORTANT: Replace with your Docker Host IP (will be appended to /etc/hosts)
+      - "dockerhost:172.17.0.1"
+      #- "api.local.goiasdigital.go.gov.br:127.0.0.1"
+    environment:
+      # IMPORTANT: Set the Remote Interpreter entry matching name to `laravel`
+      - PHP_IDE_CONFIG=serverName=localhost
+      - XDEBUG_CONFIG=remote_host=172.17.0.1
+      #- VIRTUAL_HOST=api.local.goiasdigital.go.gov.br
+    networks:
+      - app-network
+    restart: always
+
+  ### Nginx Server Container ##################################
+  nginx:
+    build:
+      context: ./docker/nginx
+      args:
+        - PHP_UPSTREAM=php-fpm
+    volumes:
+      - .:/var/www/html
+      - ./docker/nginx/timeout.conf:/etc/nginx/conf.d/timeout.conf
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+    restart: always
+    ports:
+      - "80:80"
+    networks:
+      - app-network
+
+### Memcached Container ##################################
+  memcached:
+    container_name: memcached
+    image: memcached:latest
+    ports:
+      - "11211:11211"
+    environment:
+      - MEMCACHED_USERNAME=memcached
+      - MEMCACHED_PASSWORD=123456
+    restart: always
+    networks:
+      - app-network  
+
+## elasticsearch Server Container ##################################
+#  elasticsearch:
+#    image: docker.elastic.co/elasticsearch/elasticsearch:7.12.0
+#    environment:
+#      - "node.name=es-node"
+#      - "discovery.type=single-node"
+#      - "cluster.name=enterprise-search-docker-cluster"
+#      - "bootstrap.memory_lock=true"
+#      - "xpack.security.enabled=true"
+#      - "xpack.security.authc.api_key.enabled=true"
+#      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+#    ports:
+#      - 3001:3001
+#    ulimits:
+#      memlock:
+#        soft: -1
+#        hard: -1
+#    networks:
+#      - app-network
+
+#  enterprisesearch:
+#    image: docker.elastic.co/enterprise-search/enterprise-search:7.12.0
+#    environment:
+#      - "elasticsearch.host=http://elasticsearch:9200"
+#      - "ent_search.external_url:http://elasticsearch:3002"
+#      - "ent_search.auth.default.source=standard"
+#      - "elasticsearch.username=elastic"
+#      - "elasticsearch.password=SH0U2FTPioxYSFxl4G7y"
+#      - "secret_management.encryption_keys=[96bd4a35cca12a53515e73e5d0a7da234da04ff28864c870d1f599b7b0b05859]"
+#      - "allow_es_settings_modification=true"
+#      - "JAVA_OPTS=-Xms2g -Xmx2g"
+#      - "ENT_SEARCH_DEFAULT_PASSWORD=teste12345"
+#    ports:
+#      - 3002:3002
+#    depends_on: ['elasticsearch']
+#    networks:
+#      - app-network
+    
+networks:
+  app-network:
+    driver: bridge
